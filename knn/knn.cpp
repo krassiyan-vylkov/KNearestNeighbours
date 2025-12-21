@@ -5,7 +5,8 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
-
+#include <cmath>
+#include <random>
 
 struct Iris {
 	std::vector<double> attributes;
@@ -80,43 +81,43 @@ double testAccuracy(std::vector<Iris>& trainSet, std::vector<Iris>& testSet, std
 
 void nFoldValidation(int numberOfFolds, std::vector<Iris>& trainSet, std::vector<std::string>& classes, int k, int numberOfClasses, int entriesPerClass) {
 	int foldSizePerClass = entriesPerClass / numberOfFolds;
-	std::vector<double> accuracies;
+	std::vector<double> accuraciesPerFold;
 
 	for (int currentFold = 0; currentFold < numberOfFolds; currentFold++) {
 		std::vector<Iris> foldTrainSet;
 		std::vector<Iris> foldTestSet;
-		for (int j = 0; j < numberOfClasses; j++) {
-			for (int i = j * entriesPerClass; i < currentFold * foldSizePerClass + entriesPerClass * j; i++) {
-				foldTrainSet.push_back(trainSet[i]);
+		for (int currClassIndex = 0; currClassIndex < numberOfClasses; currClassIndex++) {
+			for (int irisIndex = currClassIndex * entriesPerClass; irisIndex < currentFold * foldSizePerClass + entriesPerClass * currClassIndex; irisIndex++) {
+				foldTrainSet.push_back(trainSet[irisIndex]);
 			}
-			for (int i = currentFold * foldSizePerClass + entriesPerClass * j; i < (currentFold + 1) * foldSizePerClass + entriesPerClass * j; i++) {
-				foldTestSet.push_back(trainSet[i]);
+			for (int irisIndex = currentFold * foldSizePerClass + entriesPerClass * currClassIndex; irisIndex < (currentFold + 1) * foldSizePerClass + entriesPerClass * currClassIndex; irisIndex++) {
+				foldTestSet.push_back(trainSet[irisIndex]);
 			}
-			for (int i = (currentFold + 1) * foldSizePerClass + entriesPerClass * j; i < entriesPerClass * (j + 1); i++) { 
-				foldTrainSet.push_back(trainSet[i]);
+			for (int irisIndex = (currentFold + 1) * foldSizePerClass + entriesPerClass * currClassIndex; irisIndex < entriesPerClass * (currClassIndex + 1); irisIndex++) {
+				foldTrainSet.push_back(trainSet[irisIndex]);
 			}
 		}
 		double currFoldAccuracy = testAccuracy(foldTrainSet, foldTestSet, classes, k);
-		accuracies.push_back(currFoldAccuracy);
+		accuraciesPerFold.push_back(currFoldAccuracy);
 	}
 
 	double accuracySum = 0;
 	std::cout << "2. "<< numberOfFolds <<"-Fold Cross-Validation Results:" << std::endl;
 	std::cout << std::endl;
-	for (int i = 0; i < accuracies.size(); i++) {
-		accuracySum += accuracies[i];
-		std::cout << "   Accuracy Fold " << i + 1 << ": " << accuracies[i] << "%" << std::endl;
+	for (int i = 0; i < accuraciesPerFold.size(); i++) {
+		accuracySum += accuraciesPerFold[i];
+		std::cout << "   Accuracy Fold " << i + 1 << ": " << accuraciesPerFold[i] << "%" << std::endl;
 	}
-	double averargeAccuracy = accuracySum / accuracies.size();
+	double averargeAccuracy = accuracySum / accuraciesPerFold.size();
 	std::cout << std::endl;
 	std::cout << "   Average accuracy: " << averargeAccuracy << "%" << std::endl;
 
 	double deviationSum = 0;
-	for (int i = 0; i < accuracies.size(); i++) {
-		deviationSum = pow(accuracies[i] - averargeAccuracy, 2) + deviationSum;
+	for (int i = 0; i < accuraciesPerFold.size(); i++) {
+		deviationSum = pow(accuraciesPerFold[i] - averargeAccuracy, 2) + deviationSum;
 	}
 
-	double standardDeviation = sqrt(deviationSum/accuracies.size());
+	double standardDeviation = sqrt(deviationSum/accuraciesPerFold.size());
 	std::cout << "   Standard deviation: " << standardDeviation << "%" << std::endl;
 }
 
@@ -131,9 +132,12 @@ void knn(int k, std::vector<Iris>& dataSet) {
 		classes.push_back(dataSet[i * entriesPerClass].irisClass);
 	}
 
-	std::random_shuffle(dataSet.begin(),dataSet.begin()+entriesPerClass);
-	std::random_shuffle(dataSet.begin() + entriesPerClass, dataSet.begin() + 2*entriesPerClass);
-	std::random_shuffle(dataSet.begin() + 2*entriesPerClass, dataSet.end());
+	std::random_device rd;
+	std::mt19937 g(rd());
+
+	std::shuffle(dataSet.begin(),dataSet.begin()+entriesPerClass, g);
+	std::shuffle(dataSet.begin() + entriesPerClass, dataSet.begin() + 2*entriesPerClass, g);
+	std::shuffle(dataSet.begin() + 2*entriesPerClass, dataSet.end(), g);
 	
 	double testSetSizePercentage = 0.2;
 	int numberOfFolds = 10;
@@ -167,9 +171,16 @@ void knn(int k, std::vector<Iris>& dataSet) {
 
 int main()
 {
-	srand(time(0));
+	/*
+	The iris.data file can be found at https://archive.ics.uci.edu/dataset/53/iris
+	*/
 
 	std::ifstream f("iris.data");
+	if (!f.is_open()) {
+		std::cerr << "Error opening iris.data file";
+		return 1;
+	}
+
 	std::string str;
 	std::vector<Iris> dataSet;
 	while (std::getline(f, str)) {
